@@ -9,12 +9,28 @@ dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 5000;
-const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN || "http://localhost:3000";
+const configuredOrigins = (process.env.CLIENT_ORIGIN || "")
+  .split(",")
+  .map((o) => o.trim())
+  .filter(Boolean);
+
+const allowedOrigins = [
+  ...configuredOrigins,
+  "https://tejas-elevator-frontend.vercel.app",
+  "http://localhost:3000",
+  "http://127.0.0.1:3000",
+];
 
 // Middleware
 app.use(
   cors({
-    origin: [CLIENT_ORIGIN, "http://localhost:3000", "http://127.0.0.1:3000"],
+    origin: (origin, callback) => {
+      if (!origin) return callback(null, true);
+      const isAllowed =
+        allowedOrigins.includes(origin) ||
+        origin.endsWith(".vercel.app");
+      callback(null, isAllowed);
+    },
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
   })
