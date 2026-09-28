@@ -1,4 +1,5 @@
 import { supabase } from "../config/supabase.js";
+import { sendInquiryNotification } from "../services/email.service.js";
 
 // In-memory store fallback when Supabase is not configured yet
 const localInquiries = [];
@@ -59,6 +60,11 @@ export const createInquiry = async (req, res) => {
     console.log(`Message: ${message || "N/A"}`);
     console.log(`Notified Desk: Engineering Consultation Desk (tejaselevatorengineering@gmail.com)`);
     console.log("==================================================");
+
+    // Trigger real-time email notification asynchronously (non-blocking)
+    sendInquiryNotification(savedData).catch((err) => {
+      console.error("[Email Notification Trigger Error]:", err);
+    });
 
     return res.status(201).json({
       success: true,

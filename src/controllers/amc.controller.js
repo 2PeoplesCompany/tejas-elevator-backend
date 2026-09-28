@@ -1,4 +1,5 @@
 import { supabase } from "../config/supabase.js";
+import { sendAMCNotification } from "../services/email.service.js";
 
 const localAMC = [];
 
@@ -53,6 +54,11 @@ export const createAMCRequest = async (req, res) => {
     console.log(`Property: ${propertyName} | Contact: ${contactName} (${phone})`);
     console.log(`Plan: ${planType} | Lifts: ${currentLiftsCount}`);
     console.log("--------------------------------------------------");
+
+    // Trigger real-time AMC email notification asynchronously
+    sendAMCNotification(savedData).catch((err) => {
+      console.error("[Email Notification Trigger Error (AMC)]:", err);
+    });
 
     return res.status(201).json({
       success: true,
