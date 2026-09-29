@@ -35,7 +35,53 @@ app.use(
     allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
-app.use(express.json());
+// Security Headers Middleware
+app.use((req, res, next) => {
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("X-Frame-Options", "DENY");
+  res.setHeader("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
+  res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+  next();
+});
+
+// JSON & URL-encoded body limit to prevent payload-based Denial of Service (DoS)
+app.use(express.json({ limit: "1mb" }));
+app.use(express.urlencoded({ extended: true, limit: "1mb" }));
+
+// Zero-dependency in-memory rate limiter to protect public forms & auth endpoints
+const rateLimitCache = new Map();
+const rateLimiter = (maxRequests = 30, windowMs = 60 * 1000) => (req, res, next) => {
+  const clientIp =
+    req.headers["x-forwarded-for"]?.split(",")[0]?.trim() ||
+    req.socket.remoteAddress ||
+    "client";
+  const key = `${clientIp}:${req.baseUrl || req.path}`;
+  const now = Date.now();
+
+  const record = rateLimitCache.get(key) || { count: 0, resetTime: now + windowMs };
+  if (now > record.resetTime) {
+    record.count = 1;
+    record.resetTime = now + windowMs;
+  } else {
+    record.count += 1;
+  }
+  rateLimitCache.set(key, record);
+
+  // Auto garbage collection of stale entries
+  if (rateLimitCache.size > 5000) {
+    for (const [k, v] of rateLimitCache.entries()) {
+      if (now > v.resetTime) rateLimitCache.delete(k);
+    }
+  }
+
+  if (record.count > maxRequests) {
+    return res.status(429).json({
+      success: false,
+      error: "Too many requests. Please wait a minute before trying again.",
+    });
+  }
+  next();
+};
 
 // Root Welcome & Status
 app.get("/", (req, res) => {
@@ -64,9 +110,9 @@ app.get("/api/health", (req, res) => {
   });
 });
 
-// Mount Routes
-app.use("/api/inquiries", inquiryRoutes);
-app.use("/api/amc", amcRoutes);
+// Mount Routes with Rate Limiting Protection
+app.use("/api/inquiries", rateLimiter(20, 60000), inquiryRoutes);
+app.use("/api/amc", rateLimiter(20, 60000), amcRoutes);
 app.use("/api/admin", adminRoutes);
 
 // 404 Handler

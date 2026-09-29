@@ -8,7 +8,7 @@ export const createInquiry = async (req, res) => {
   try {
     const { fullName, phone, email, liftType, floors, buildingType, message } = req.body;
 
-    // Validation
+    // Input Validation
     if (!fullName || !phone || !email) {
       return res.status(400).json({
         success: false,
@@ -16,14 +16,30 @@ export const createInquiry = async (req, res) => {
       });
     }
 
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email.trim())) {
+      return res.status(400).json({
+        success: false,
+        error: "Please provide a valid email address.",
+      });
+    }
+
+    const cleanPhone = phone.trim().replace(/[^0-9+()-\s]/g, "");
+    if (cleanPhone.length < 7 || cleanPhone.length > 25) {
+      return res.status(400).json({
+        success: false,
+        error: "Please provide a valid phone number (at least 7 digits).",
+      });
+    }
+
     const newInquiry = {
-      full_name: fullName.trim(),
-      phone: phone.trim(),
-      email: email.trim(),
-      lift_type: liftType || "Passenger Elevators",
-      floors: floors || "G + 3 Floors",
-      building_type: buildingType || "Residential",
-      message: message ? message.trim() : "",
+      full_name: fullName.trim().slice(0, 120),
+      phone: cleanPhone,
+      email: email.trim().toLowerCase().slice(0, 150),
+      lift_type: (liftType || "Passenger Elevators").slice(0, 100),
+      floors: (floors || "G + 3 Floors").slice(0, 100),
+      building_type: (buildingType || "Residential").slice(0, 100),
+      message: message ? message.trim().slice(0, 3000) : "",
       status: "new",
       assigned_to: "Rajiv Kumar Sethi",
       created_at: new Date().toISOString(),

@@ -1,5 +1,5 @@
 -- ==============================================================================
--- TEJAS ELEVATOR ENGINEERING - SUPABASE DATABASE SCHEMA
+-- TEJAS ELEVATOR ENGINEERING - SUPABASE DATABASE SCHEMA & SECURITY HARDENING
 -- Run this in your Supabase Dashboard: SQL Editor -> New Query -> Run
 -- ==============================================================================
 
@@ -33,30 +33,69 @@ CREATE TABLE IF NOT EXISTS public.amc_requests (
     created_at TIMESTAMPTZ DEFAULT now()
 );
 
--- 3. Enable Public Access / RLS Policies (Allows Backend to Read/Write)
+-- 3. Row Level Security (RLS) Policies (Production Hardened)
 ALTER TABLE public.inquiries ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.amc_requests ENABLE ROW LEVEL SECURITY;
 
--- Allow insert from public (Frontend / API)
+-- Allow public form submission (INSERT only)
+DROP POLICY IF EXISTS "Allow public inserts to inquiries" ON public.inquiries;
 CREATE POLICY "Allow public inserts to inquiries" 
 ON public.inquiries 
 FOR INSERT 
 WITH CHECK (true);
 
-CREATE POLICY "Allow public reads to inquiries" 
+-- Restrict SELECT to authenticated administrators only (protects client phone numbers & data)
+DROP POLICY IF EXISTS "Allow public reads to inquiries" ON public.inquiries;
+DROP POLICY IF EXISTS "Allow admin reads to inquiries" ON public.inquiries;
+CREATE POLICY "Allow admin reads to inquiries" 
 ON public.inquiries 
 FOR SELECT 
-USING (true);
+TO authenticated
+USING ((auth.jwt() -> 'user_metadata' ->> 'role') = 'admin');
 
+-- Restrict UPDATE and DELETE to authenticated administrators
+DROP POLICY IF EXISTS "Allow admin updates to inquiries" ON public.inquiries;
+CREATE POLICY "Allow admin updates to inquiries" 
+ON public.inquiries 
+FOR UPDATE 
+TO authenticated
+USING ((auth.jwt() -> 'user_metadata' ->> 'role') = 'admin');
+
+DROP POLICY IF EXISTS "Allow admin deletes to inquiries" ON public.inquiries;
+CREATE POLICY "Allow admin deletes to inquiries" 
+ON public.inquiries 
+FOR DELETE 
+TO authenticated
+USING ((auth.jwt() -> 'user_metadata' ->> 'role') = 'admin');
+
+-- AMC Requests Policies
+DROP POLICY IF EXISTS "Allow public inserts to amc_requests" ON public.amc_requests;
 CREATE POLICY "Allow public inserts to amc_requests" 
 ON public.amc_requests 
 FOR INSERT 
 WITH CHECK (true);
 
-CREATE POLICY "Allow public reads to amc_requests" 
+DROP POLICY IF EXISTS "Allow public reads to amc_requests" ON public.amc_requests;
+DROP POLICY IF EXISTS "Allow admin reads to amc_requests" ON public.amc_requests;
+CREATE POLICY "Allow admin reads to amc_requests" 
 ON public.amc_requests 
 FOR SELECT 
-USING (true);
+TO authenticated
+USING ((auth.jwt() -> 'user_metadata' ->> 'role') = 'admin');
 
--- (Optional) If you use SUPABASE_SERVICE_ROLE_KEY in backend/.env, 
--- service_role automatically has full admin bypass on all tables.
+DROP POLICY IF EXISTS "Allow admin updates to amc_requests" ON public.amc_requests;
+CREATE POLICY "Allow admin updates to amc_requests" 
+ON public.amc_requests 
+FOR UPDATE 
+TO authenticated
+USING ((auth.jwt() -> 'user_metadata' ->> 'role') = 'admin');
+
+DROP POLICY IF EXISTS "Allow admin deletes to amc_requests" ON public.amc_requests;
+CREATE POLICY "Allow admin deletes to amc_requests" 
+ON public.amc_requests 
+FOR DELETE 
+TO authenticated
+USING ((auth.jwt() -> 'user_metadata' ->> 'role') = 'admin');
+
+-- NOTE: The Node.js backend uses SUPABASE_SERVICE_ROLE_KEY, which automatically bypasses RLS.
+-- These policies ensure that even if the public anon key is exposed, visitors CANNOT read or steal customer inquiries.

@@ -14,15 +14,36 @@ export const createAMCRequest = async (req, res) => {
       });
     }
 
+    const cleanPhone = phone.trim().replace(/[^0-9+()-\s]/g, "");
+    if (cleanPhone.length < 7 || cleanPhone.length > 25) {
+      return res.status(400).json({
+        success: false,
+        error: "Please provide a valid phone number (at least 7 digits).",
+      });
+    }
+
+    if (email && email.trim()) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email.trim())) {
+        return res.status(400).json({
+          success: false,
+          error: "Please provide a valid email address.",
+        });
+      }
+    }
+
+    const parsedLifts = parseInt(currentLiftsCount, 10);
+    const safeLiftsCount = isNaN(parsedLifts) || parsedLifts < 1 ? 1 : Math.min(parsedLifts, 100);
+
     const newRequest = {
-      contact_name: contactName.trim(),
-      phone: phone.trim(),
-      email: email ? email.trim() : "",
-      property_name: propertyName.trim(),
-      property_address: propertyAddress ? propertyAddress.trim() : "",
-      current_lifts_count: parseInt(currentLiftsCount, 10) || 1,
-      plan_type: planType || "Comprehensive AMC",
-      message: message ? message.trim() : "",
+      contact_name: contactName.trim().slice(0, 120),
+      phone: cleanPhone,
+      email: email ? email.trim().toLowerCase().slice(0, 150) : "",
+      property_name: propertyName.trim().slice(0, 150),
+      property_address: propertyAddress ? propertyAddress.trim().slice(0, 300) : "",
+      current_lifts_count: safeLiftsCount,
+      plan_type: (planType || "Comprehensive AMC").slice(0, 100),
+      message: message ? message.trim().slice(0, 3000) : "",
       status: "pending",
       created_at: new Date().toISOString(),
     };

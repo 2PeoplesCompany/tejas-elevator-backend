@@ -47,16 +47,12 @@ export const setupAdminUser = async (req, res) => {
       });
     }
 
-    // Check if user already exists
+    // Security Check: Lock initial setup once an admin user exists
     const { data: existingUsers } = await supabase.auth.admin.listUsers();
-    const alreadyExists = existingUsers?.users?.some(
-      (u) => u.email.toLowerCase() === email.toLowerCase()
-    );
-
-    if (alreadyExists) {
-      return res.status(400).json({
+    if (existingUsers?.users && existingUsers.users.length > 0) {
+      return res.status(403).json({
         success: false,
-        error: "An admin account with this email already exists. Please log in.",
+        error: "Initial admin setup is locked because an administrator account already exists. Please log in directly.",
       });
     }
 
