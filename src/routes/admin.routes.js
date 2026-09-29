@@ -10,6 +10,8 @@ import {
   getAllAMCRequests,
   updateAMCRequest,
   deleteAMCRequest,
+  changeAdminPassword,
+  updateAdminProfile,
 } from "../controllers/admin.controller.js";
 import { requireAdmin } from "../middleware/admin-auth.js";
 
@@ -35,5 +37,9 @@ router.delete("/inquiries/:id", deleteInquiry);
 router.get("/amc", getAllAMCRequests);
 router.patch("/amc/:id", updateAMCRequest);
 router.delete("/amc/:id", deleteAMCRequest);
+
+// Account & Security Management
+router.post("/change-password", changeAdminPassword);
+router.put("/profile", updateAdminProfile);
 
 export default router;

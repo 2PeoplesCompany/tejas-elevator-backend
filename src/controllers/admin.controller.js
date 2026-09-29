@@ -355,3 +355,100 @@ export const deleteAMCRequest = async (req, res) => {
     return res.status(500).json({ success: false, error: err.message });
   }
 };
+
+// 11. Change Admin Password
+export const changeAdminPassword = async (req, res) => {
+  if (!checkSupabase(res)) return;
+
+  try {
+    const { currentPassword, newPassword } = req.body;
+    const user = req.adminUser;
+
+    if (!newPassword || newPassword.length < 6) {
+      return res.status(400).json({
+        success: false,
+        error: "New password must be at least 6 characters long.",
+      });
+    }
+
+    // Verify current password first by attempting sign in
+    if (currentPassword) {
+      const { error: verifyError } = await supabase.auth.signInWithPassword({
+        email: user.email,
+        password: currentPassword,
+      });
+
+      if (verifyError) {
+        return res.status(400).json({
+          success: false,
+          error: "Current password is incorrect. Please re-enter your current password.",
+        });
+      }
+    }
+
+    // Update password in Supabase Auth
+    const { error: updateError } = await supabase.auth.admin.updateUserById(user.id, {
+      password: newPassword,
+    });
+
+    if (updateError) {
+      return res.status(400).json({
+        success: false,
+        error: updateError.message,
+      });
+    }
+
+    return res.json({
+      success: true,
+      message: "Admin password updated successfully! Please use your new password next time you sign in.",
+    });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+};
+
+// 12. Update Admin Profile (Full Name / Email)
+export const updateAdminProfile = async (req, res) => {
+  if (!checkSupabase(res)) return;
+
+  try {
+    const { email, fullName } = req.body;
+    const user = req.adminUser;
+
+    const updates = {};
+    if (email && email.trim().toLowerCase() !== user.email.toLowerCase()) {
+      updates.email = email.trim().toLowerCase();
+    }
+    if (fullName && fullName.trim()) {
+      updates.user_metadata = {
+        ...(user.user_metadata || {}),
+        full_name: fullName.trim(),
+      };
+    }
+
+    if (Object.keys(updates).length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: "No profile changes provided.",
+      });
+    }
+
+    const { data, error } = await supabase.auth.admin.updateUserById(user.id, updates);
+
+    if (error) {
+      return res.status(400).json({ success: false, error: error.message });
+    }
+
+    return res.json({
+      success: true,
+      message: "Admin profile updated successfully.",
+      user: {
+        id: data.user.id,
+        email: data.user.email,
+        fullName: data.user.user_metadata?.full_name || fullName,
+      },
+    });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+};
